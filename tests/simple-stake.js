@@ -291,6 +291,66 @@ describe('simple-stake', () => {
 
   });
 
+  it('user02 with unauthorized user account should revert transaction', async () => {
+    const [_user01StakeAccountPda, _bump] = await PublicKey.findProgramAddress(
+      [user01MainAccount.publicKey.toBuffer()],
+      program.programId
+    );
+
+    try {
+      await program.rpc.stake(new anchor.BN(1000),
+        {
+          accounts: {
+            user: user02MainAccount.publicKey,
+            userAccount: _user01StakeAccountPda,
+            userTokenAccount: user02TokenAccountA,
+            poolVaultAccount: poolVaultAccountPda,
+            poolSharedAccount: poolSharedAccount.publicKey,
+            systemProgram: anchor.web3.SystemProgram.programId,
+            rent: anchor.web3.SYSVAR_RENT_PUBKEY,
+            tokenProgram: TOKEN_PROGRAM_ID,
+          },
+          signers: [user02MainAccount],
+        }
+      );
+      assert.ok(false);
+    } catch (err) {
+      const errMsg = "A seeds constraint was violated";
+      assert.equal(err.toString(), errMsg);
+    }
+
+  });
+
+  it('user02 with invalid amount should revert transaction', async () => {
+    const [_user02StakeAccountPda, _bump] = await PublicKey.findProgramAddress(
+      [user02MainAccount.publicKey.toBuffer()],
+      program.programId
+    );
+
+    try {
+      await program.rpc.stake(new anchor.BN(100000),
+        {
+          accounts: {
+            user: user02MainAccount.publicKey,
+            userAccount: _user02StakeAccountPda,
+            userTokenAccount: user02TokenAccountA,
+            poolVaultAccount: poolVaultAccountPda,
+            poolSharedAccount: poolSharedAccount.publicKey,
+            systemProgram: anchor.web3.SystemProgram.programId,
+            rent: anchor.web3.SYSVAR_RENT_PUBKEY,
+            tokenProgram: TOKEN_PROGRAM_ID,
+          },
+          signers: [user02MainAccount],
+        }
+      );
+      assert.ok(false);
+    } catch (err) {
+      const errMsg = "A raw constraint was violated";
+      assert.equal(err.toString(), errMsg);
+    }
+
+  });
+
 
 
 });
