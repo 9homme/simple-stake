@@ -31,11 +31,12 @@ pub mod simple_stake {
         Ok(())
     }
 
-    pub fn create_user_account(ctx: Context<CreateUserAccount>) -> ProgramResult {
+    pub fn create_user_account(ctx: Context<CreateUserAccount>, bump: u8) -> ProgramResult {
         // Initialize user account value
         ctx.accounts.user_account.user_key = *ctx.accounts.user.key;
         ctx.accounts.user_account.user_token_account_key = *ctx.accounts.user_token_account.to_account_info().key;
         ctx.accounts.user_account.staked_amount = 0;
+        ctx.accounts.user_account.bump = bump;
 
         Ok(())
     }
@@ -68,6 +69,7 @@ pub struct UserAccount {
     pub user_key: Pubkey,
     pub user_token_account_key: Pubkey,
     pub staked_amount: u64,
+    pub bump: u8,
 }
 
 
@@ -95,11 +97,18 @@ pub struct Initialize<'info> {
 }
 
 #[derive(Accounts)]
+#[instruction(bump: u8)]
 pub struct CreateUserAccount<'info> {
     #[account(mut)]
     pub user: Signer<'info>,
-    #[account(zero)]
-    pub user_account: ProgramAccount<'info, UserAccount>,
+    #[account(
+        init,
+        seeds = [user.key.as_ref()],
+        bump = bump,
+        payer = user,
+        space = 8 + 32 + 32 + 8 + 1,
+    )]
+    pub user_account: Account<'info, UserAccount>,
     #[account(mut)]
     pub user_token_account: Account<'info, TokenAccount>,
     pub system_program: AccountInfo<'info>,
@@ -113,10 +122,12 @@ pub struct Stake<'info> {
     pub user: Signer<'info>,
     #[account(
         mut,
+        seeds = [user.key.as_ref()],
+        bump = user_account.bump,
         constraint = user_account.user_key == *user.key,
         constraint = user_account.user_token_account_key == *user_token_account.to_account_info().key
     )]
-    pub user_account: ProgramAccount<'info, UserAccount>,
+    pub user_account: Account<'info, UserAccount>,
     #[account(
         mut,
         constraint = user_token_account.amount >= staked_amount
