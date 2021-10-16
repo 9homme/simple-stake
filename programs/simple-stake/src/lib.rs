@@ -34,27 +34,48 @@ pub mod simple_stake {
     pub fn create_user_account(ctx: Context<CreateUserAccount>, bump: u8) -> ProgramResult {
         // Initialize user account value
         ctx.accounts.user_account.user_key = *ctx.accounts.user.key;
-        ctx.accounts.user_account.user_token_account_key = *ctx.accounts.user_token_account.to_account_info().key;
+        ctx.accounts.user_account.user_token_account_key =
+            *ctx.accounts.user_token_account.to_account_info().key;
         ctx.accounts.user_account.staked_amount = 0;
         ctx.accounts.user_account.bump = bump;
 
         Ok(())
     }
 
-    pub fn stake(ctx: Context<Stake>, staked_amount: u64) -> ProgramResult {
+    pub fn stake(ctx: Context<Stake>, stake_amount: u64) -> ProgramResult {
         // Update user account value
-        ctx.accounts.user_account.staked_amount = staked_amount;
+        ctx.accounts.user_account.staked_amount =
+            ctx.accounts.user_account.staked_amount + stake_amount;
         // Update pool shared account
-        ctx.accounts.pool_shared_account.total_staked_amount = ctx.accounts.pool_shared_account.total_staked_amount + staked_amount;
+        ctx.accounts.pool_shared_account.total_staked_amount =
+            ctx.accounts.pool_shared_account.total_staked_amount + stake_amount;
         // Transfer user's token to vault
-        token::transfer(
-            ctx.accounts.into_transfer_to_vault_context(),
-            staked_amount,
-        )?;
+        token::transfer(ctx.accounts.into_transfer_to_vault_context(), stake_amount)?;
 
         Ok(())
     }
 
+    pub fn unstake(ctx: Context<Unstake>, unstake_amount: u64) -> ProgramResult {
+        // Update user account value
+        ctx.accounts.user_account.staked_amount =
+            ctx.accounts.user_account.staked_amount - unstake_amount;
+        // Update pool shared account
+        ctx.accounts.pool_shared_account.total_staked_amount =
+            ctx.accounts.pool_shared_account.total_staked_amount - unstake_amount;
+
+        let (_pool_vault_authority, pool_vault_authority_bump) =
+            Pubkey::find_program_address(&[SIMPLE_STAKE_PDA_SEED], ctx.program_id);
+        let pool_authority_seeds = &[&SIMPLE_STAKE_PDA_SEED[..], &[pool_vault_authority_bump]];
+
+        token::transfer(
+            ctx.accounts
+                .into_transfer_to_user_context()
+                .with_signer(&[&pool_authority_seeds[..]]),
+            unstake_amount,
+        )?;
+
+        Ok(())
+    }
 }
 
 #[account]
@@ -71,8 +92,6 @@ pub struct UserAccount {
     pub staked_amount: u64,
     pub bump: u8,
 }
-
-
 
 #[derive(Accounts)]
 #[instruction(pool_vault_account_bump: u8)]
@@ -112,11 +131,10 @@ pub struct CreateUserAccount<'info> {
     #[account(mut)]
     pub user_token_account: Account<'info, TokenAccount>,
     pub system_program: AccountInfo<'info>,
-    pub rent: Sysvar<'info, Rent>,
 }
 
 #[derive(Accounts)]
-#[instruction(staked_amount: u64)]
+#[instruction(stake_amount: u64)]
 pub struct Stake<'info> {
     #[account(mut)]
     pub user: Signer<'info>,
@@ -130,7 +148,7 @@ pub struct Stake<'info> {
     pub user_account: Account<'info, UserAccount>,
     #[account(
         mut,
-        constraint = user_token_account.amount >= staked_amount
+        constraint = user_token_account.amount >= stake_amount
     )]
     pub user_token_account: Account<'info, TokenAccount>,
     #[account(mut)]
@@ -138,10 +156,33 @@ pub struct Stake<'info> {
     #[account(mut)]
     pub pool_shared_account: ProgramAccount<'info, PoolSharedAccount>,
     pub system_program: AccountInfo<'info>,
-    pub rent: Sysvar<'info, Rent>,
     pub token_program: AccountInfo<'info>,
 }
 
+#[derive(Accounts)]
+#[instruction(unstake_amount: u64)]
+pub struct Unstake<'info> {
+    #[account(mut)]
+    pub user: Signer<'info>,
+    #[account(
+        mut,
+        seeds = [user.key.as_ref()],
+        bump = user_account.bump,
+        constraint = user_account.user_key == *user.key,
+        constraint = user_account.user_token_account_key == *user_token_account.to_account_info().key,
+        constraint = user_account.staked_amount >= unstake_amount
+    )]
+    pub user_account: Account<'info, UserAccount>,
+    #[account(mut)]
+    pub user_token_account: Account<'info, TokenAccount>,
+    #[account(mut)]
+    pub pool_vault_account: Account<'info, TokenAccount>,
+    pub pool_vault_authority: AccountInfo<'info>,
+    #[account(mut)]
+    pub pool_shared_account: ProgramAccount<'info, PoolSharedAccount>,
+    pub system_program: AccountInfo<'info>,
+    pub token_program: AccountInfo<'info>,
+}
 
 impl<'info> Initialize<'info> {
     fn into_set_authority_context(&self) -> CpiContext<'_, '_, '_, 'info, SetAuthority<'info>> {
@@ -155,16 +196,23 @@ impl<'info> Initialize<'info> {
 }
 
 impl<'info> Stake<'info> {
-    fn into_transfer_to_vault_context(
-        &self,
-    ) -> CpiContext<'_, '_, '_, 'info, Transfer<'info>> {
+    fn into_transfer_to_vault_context(&self) -> CpiContext<'_, '_, '_, 'info, Transfer<'info>> {
         let cpi_accounts = Transfer {
             from: self.user_token_account.to_account_info().clone(),
-            to: self
-                .pool_vault_account
-                .to_account_info()
-                .clone(),
+            to: self.pool_vault_account.to_account_info().clone(),
             authority: self.user.to_account_info().clone(),
+        };
+        let cpi_program = self.token_program.to_account_info();
+        CpiContext::new(cpi_program, cpi_accounts)
+    }
+}
+
+impl<'info> Unstake<'info> {
+    fn into_transfer_to_user_context(&self) -> CpiContext<'_, '_, '_, 'info, Transfer<'info>> {
+        let cpi_accounts = Transfer {
+            from: self.pool_vault_account.to_account_info().clone(),
+            to: self.user_token_account.to_account_info().clone(),
+            authority: self.pool_vault_authority.clone(),
         };
         let cpi_program = self.token_program.to_account_info();
         CpiContext::new(cpi_program, cpi_accounts)

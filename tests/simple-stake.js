@@ -161,7 +161,6 @@ describe('simple-stake', () => {
           userAccount: _user01StakeAccountPda,
           userTokenAccount: user01TokenAccountA,
           systemProgram: anchor.web3.SystemProgram.programId,
-          rent: anchor.web3.SYSVAR_RENT_PUBKEY
         },
         signers: [user01MainAccount],
       }
@@ -189,7 +188,6 @@ describe('simple-stake', () => {
           poolVaultAccount: poolVaultAccountPda,
           poolSharedAccount: poolSharedAccount.publicKey,
           systemProgram: anchor.web3.SystemProgram.programId,
-          rent: anchor.web3.SYSVAR_RENT_PUBKEY,
           tokenProgram: TOKEN_PROGRAM_ID,
         },
         signers: [user01MainAccount],
@@ -227,7 +225,6 @@ describe('simple-stake', () => {
             poolVaultAccount: poolVaultAccountPda,
             poolSharedAccount: poolSharedAccount.publicKey,
             systemProgram: anchor.web3.SystemProgram.programId,
-            rent: anchor.web3.SYSVAR_RENT_PUBKEY,
             tokenProgram: TOKEN_PROGRAM_ID,
           },
           signers: [user02MainAccount],
@@ -254,7 +251,6 @@ describe('simple-stake', () => {
           userAccount: _user02StakeAccountPda,
           userTokenAccount: user02TokenAccountA,
           systemProgram: anchor.web3.SystemProgram.programId,
-          rent: anchor.web3.SYSVAR_RENT_PUBKEY
         },
         signers: [user02MainAccount],
       }
@@ -269,7 +265,6 @@ describe('simple-stake', () => {
           poolVaultAccount: poolVaultAccountPda,
           poolSharedAccount: poolSharedAccount.publicKey,
           systemProgram: anchor.web3.SystemProgram.programId,
-          rent: anchor.web3.SYSVAR_RENT_PUBKEY,
           tokenProgram: TOKEN_PROGRAM_ID,
         },
         signers: [user02MainAccount],
@@ -307,7 +302,6 @@ describe('simple-stake', () => {
             poolVaultAccount: poolVaultAccountPda,
             poolSharedAccount: poolSharedAccount.publicKey,
             systemProgram: anchor.web3.SystemProgram.programId,
-            rent: anchor.web3.SYSVAR_RENT_PUBKEY,
             tokenProgram: TOKEN_PROGRAM_ID,
           },
           signers: [user02MainAccount],
@@ -337,7 +331,6 @@ describe('simple-stake', () => {
             poolVaultAccount: poolVaultAccountPda,
             poolSharedAccount: poolSharedAccount.publicKey,
             systemProgram: anchor.web3.SystemProgram.programId,
-            rent: anchor.web3.SYSVAR_RENT_PUBKEY,
             tokenProgram: TOKEN_PROGRAM_ID,
           },
           signers: [user02MainAccount],
@@ -351,6 +344,72 @@ describe('simple-stake', () => {
 
   });
 
+  it('user02 can unstake some token from contract', async () => {
+    const [_user02StakeAccountPda, _bump] = await PublicKey.findProgramAddress(
+      [user02MainAccount.publicKey.toBuffer()],
+      program.programId
+    );
 
+    await program.rpc.unstake(new anchor.BN(1000),
+        {
+          accounts: {
+            user: user02MainAccount.publicKey,
+            userAccount: _user02StakeAccountPda,
+            userTokenAccount: user02TokenAccountA,
+            poolVaultAccount: poolVaultAccountPda,
+            poolVaultAuthority: poolVaultAuthorityPda,
+            poolSharedAccount: poolSharedAccount.publicKey,
+            systemProgram: anchor.web3.SystemProgram.programId,
+            tokenProgram: TOKEN_PROGRAM_ID,
+          },
+          signers: [user02MainAccount],
+        }
+      );
+
+      let _user02StakeAccount = await program.account.userAccount.fetch(
+        _user02StakeAccountPda
+      );
+  
+  
+      assert.equal(_user02StakeAccount.stakedAmount.toNumber(), 1000);
+  
+      let _user02CurrentToken = await mintA.getAccountInfo(user02TokenAccountA);
+      let _vaultCurrentToken = await mintA.getAccountInfo(poolVaultAccountPda);
+  
+      assert.equal(_user02CurrentToken.amount.toNumber(), intializedTokenAmount - 2000 + 1000);
+      assert.equal(_vaultCurrentToken.amount.toNumber(), 1000 + 2000 - 1000);
+
+  });
+
+  it('user01 should not be able to unstake token more than staked amount', async () => {
+    const [_user01StakeAccountPda, _bump] = await PublicKey.findProgramAddress(
+      [user01MainAccount.publicKey.toBuffer()],
+      program.programId
+    );
+
+    try {
+      await program.rpc.unstake(new anchor.BN(2000),
+        {
+          accounts: {
+            user: user01MainAccount.publicKey,
+            userAccount: _user01StakeAccountPda,
+            userTokenAccount: user01TokenAccountA,
+            poolVaultAccount: poolVaultAccountPda,
+            poolVaultAuthority: poolVaultAuthorityPda,
+            poolSharedAccount: poolSharedAccount.publicKey,
+            systemProgram: anchor.web3.SystemProgram.programId,
+            tokenProgram: TOKEN_PROGRAM_ID,
+          },
+          signers: [user01MainAccount],
+        }
+      );
+      assert.ok(false);
+    } catch (err) {
+      const errMsg = "A raw constraint was violated";
+      assert.equal(err.toString(), errMsg);
+    }
+
+
+  });
 
 });
