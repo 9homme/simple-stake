@@ -209,6 +209,22 @@ describe('simple-stake', () => {
 
   });
 
+  it('user02 when account not yet created then should response error when fetching account detail', async () => {
+    const [_user02StakeAccountPda, _bump] = await PublicKey.findProgramAddress(
+      [user02MainAccount.publicKey.toBuffer()],
+      program.programId
+    );
+    try {
+      await program.account.userAccount.fetch(
+        _user02StakeAccountPda
+      );
+      assert.ok(false);
+    } catch (err) {
+      const errMsg = `Error: Account does not exist ${_user02StakeAccountPda}`;
+      assert.equal(err.toString(), errMsg);
+    }
+  });
+
   it('user02 when account not yet created should revert transaction', async () => {
     const [_user02StakeAccountPda, _bump] = await PublicKey.findProgramAddress(
       [user02MainAccount.publicKey.toBuffer()],
@@ -351,33 +367,33 @@ describe('simple-stake', () => {
     );
 
     await program.rpc.unstake(new anchor.BN(1000),
-        {
-          accounts: {
-            user: user02MainAccount.publicKey,
-            userAccount: _user02StakeAccountPda,
-            userTokenAccount: user02TokenAccountA,
-            poolVaultAccount: poolVaultAccountPda,
-            poolVaultAuthority: poolVaultAuthorityPda,
-            poolSharedAccount: poolSharedAccount.publicKey,
-            systemProgram: anchor.web3.SystemProgram.programId,
-            tokenProgram: TOKEN_PROGRAM_ID,
-          },
-          signers: [user02MainAccount],
-        }
-      );
+      {
+        accounts: {
+          user: user02MainAccount.publicKey,
+          userAccount: _user02StakeAccountPda,
+          userTokenAccount: user02TokenAccountA,
+          poolVaultAccount: poolVaultAccountPda,
+          poolVaultAuthority: poolVaultAuthorityPda,
+          poolSharedAccount: poolSharedAccount.publicKey,
+          systemProgram: anchor.web3.SystemProgram.programId,
+          tokenProgram: TOKEN_PROGRAM_ID,
+        },
+        signers: [user02MainAccount],
+      }
+    );
 
-      let _user02StakeAccount = await program.account.userAccount.fetch(
-        _user02StakeAccountPda
-      );
-  
-  
-      assert.equal(_user02StakeAccount.stakedAmount.toNumber(), 1000);
-  
-      let _user02CurrentToken = await mintA.getAccountInfo(user02TokenAccountA);
-      let _vaultCurrentToken = await mintA.getAccountInfo(poolVaultAccountPda);
-  
-      assert.equal(_user02CurrentToken.amount.toNumber(), intializedTokenAmount - 2000 + 1000);
-      assert.equal(_vaultCurrentToken.amount.toNumber(), 1000 + 2000 - 1000);
+    let _user02StakeAccount = await program.account.userAccount.fetch(
+      _user02StakeAccountPda
+    );
+
+
+    assert.equal(_user02StakeAccount.stakedAmount.toNumber(), 1000);
+
+    let _user02CurrentToken = await mintA.getAccountInfo(user02TokenAccountA);
+    let _vaultCurrentToken = await mintA.getAccountInfo(poolVaultAccountPda);
+
+    assert.equal(_user02CurrentToken.amount.toNumber(), intializedTokenAmount - 2000 + 1000);
+    assert.equal(_vaultCurrentToken.amount.toNumber(), 1000 + 2000 - 1000);
 
   });
 
