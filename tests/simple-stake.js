@@ -23,6 +23,8 @@ describe('simple-stake', () => {
 
 
   const poolSharedAccount = anchor.web3.Keypair.generate();
+  const user01StakeAccount =  anchor.web3.Keypair.generate();
+  const user02StakeAccount =  anchor.web3.Keypair.generate();
   const payer = anchor.web3.Keypair.generate();
   const mintAuthority = anchor.web3.Keypair.generate();
   const initializerMainAccount = anchor.web3.Keypair.generate();
@@ -91,11 +93,11 @@ describe('simple-stake', () => {
       intializedTokenAmount
     );
 
-    let user01CurrentToken = await mintA.getAccountInfo(user01TokenAccountA);
-    let user02CurrentToken = await mintA.getAccountInfo(user02TokenAccountA);
+    let _user01CurrentToken = await mintA.getAccountInfo(user01TokenAccountA);
+    let _user02CurrentToken = await mintA.getAccountInfo(user02TokenAccountA);
 
-    assert.ok(user01CurrentToken.amount.toNumber() == intializedTokenAmount);
-    assert.ok(user02CurrentToken.amount.toNumber() == intializedTokenAmount);
+    assert.equal(_user01CurrentToken.amount.toNumber(), intializedTokenAmount);
+    assert.equal(_user02CurrentToken.amount.toNumber(), intializedTokenAmount);
 
   });
 
@@ -141,13 +143,71 @@ describe('simple-stake', () => {
       poolSharedAccount.publicKey
     );
 
-    // Check that the new owner is the PDA.
     assert.ok(_vault.owner.equals(poolVaultAuthorityPda));
 
-    // Check that the values in the escrow account match what we expect.
     assert.ok(_poolSharedAccount.initializerKey.equals(initializerMainAccount.publicKey));
     assert.ok(_poolSharedAccount.poolVaultAccountKey.equals(poolVaultAccountPda));
-    assert.ok(_poolSharedAccount.totalStakedAmount.toNumber() == 0);
+    assert.equal(_poolSharedAccount.totalStakedAmount.toNumber(), 0);
 
   });
+
+  it('can create new user account for user01 successfully', async () => {
+
+    await program.rpc.createUserAccount(
+      {
+        accounts: {
+          user: user01MainAccount.publicKey,
+          userAccount: user01StakeAccount.publicKey,
+          userTokenAccount: user01TokenAccountA,
+          systemProgram: anchor.web3.SystemProgram.programId,
+          rent: anchor.web3.SYSVAR_RENT_PUBKEY
+        },
+        instructions: [
+          await program.account.userAccount.createInstruction(user01StakeAccount),
+        ],
+        signers: [user01StakeAccount, user01MainAccount],
+      }
+    );
+
+    let _user01StakeAccount = await program.account.userAccount.fetch(
+      user01StakeAccount.publicKey
+    );
+
+    assert.equal(_user01StakeAccount.stakedAmount.toNumber(), 0);
+
+  });
+
+  it('user01 can stake token to the pool', async () => {
+
+    await program.rpc.stake( new anchor.BN(1000),
+      {
+        accounts: {
+          user: user01MainAccount.publicKey,
+          userAccount: user01StakeAccount.publicKey,
+          userTokenAccount: user01TokenAccountA,
+          poolVaultAccount: poolVaultAccountPda,
+          poolSharedAccount: poolSharedAccount.publicKey,
+          systemProgram: anchor.web3.SystemProgram.programId,
+          rent: anchor.web3.SYSVAR_RENT_PUBKEY,
+          tokenProgram: TOKEN_PROGRAM_ID,
+        },
+        signers: [user01MainAccount],
+      }
+    );
+
+    let _user01StakeAccount = await program.account.userAccount.fetch(
+      user01StakeAccount.publicKey
+    );
+
+
+    assert.equal(_user01StakeAccount.stakedAmount.toNumber() , 1000);
+
+    let _user01CurrentToken = await mintA.getAccountInfo(user01TokenAccountA);
+    let _vaultCurrentToken = await mintA.getAccountInfo(poolVaultAccountPda);
+
+    assert.equal(_user01CurrentToken.amount.toNumber(), intializedTokenAmount - 1000);
+    assert.equal(_vaultCurrentToken.amount.toNumber(), 1000);
+
+  });
+
 });
