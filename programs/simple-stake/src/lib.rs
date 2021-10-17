@@ -1,5 +1,5 @@
 use anchor_lang::prelude::*;
-use anchor_spl::token::{self, Transfer};
+use anchor_spl::token::{self, Token, Transfer};
 use anchor_spl::token::{Mint, SetAuthority, TokenAccount};
 use spl_token::instruction::AuthorityType;
 
@@ -109,10 +109,10 @@ pub struct Initialize<'info> {
     )]
     pub pool_vault_account: Account<'info, TokenAccount>,
     #[account(zero)]
-    pub pool_shared_account: ProgramAccount<'info, PoolSharedAccount>,
-    pub system_program: AccountInfo<'info>,
+    pub pool_shared_account: Account<'info, PoolSharedAccount>,
+    pub system_program: Program<'info, System>,
     pub rent: Sysvar<'info, Rent>,
-    pub token_program: AccountInfo<'info>,
+    pub token_program: Program<'info, Token>,
 }
 
 #[derive(Accounts)]
@@ -130,7 +130,7 @@ pub struct CreateUserAccount<'info> {
     pub user_account: Account<'info, UserAccount>,
     #[account(mut)]
     pub user_token_account: Account<'info, TokenAccount>,
-    pub system_program: AccountInfo<'info>,
+    pub system_program: Program<'info, System>,
 }
 
 #[derive(Accounts)]
@@ -154,9 +154,9 @@ pub struct Stake<'info> {
     #[account(mut)]
     pub pool_vault_account: Account<'info, TokenAccount>,
     #[account(mut)]
-    pub pool_shared_account: ProgramAccount<'info, PoolSharedAccount>,
-    pub system_program: AccountInfo<'info>,
-    pub token_program: AccountInfo<'info>,
+    pub pool_shared_account: Account<'info, PoolSharedAccount>,
+    pub system_program: Program<'info, System>,
+    pub token_program: Program<'info, Token>,
 }
 
 #[derive(Accounts)]
@@ -180,8 +180,8 @@ pub struct Unstake<'info> {
     pub pool_vault_authority: AccountInfo<'info>,
     #[account(mut)]
     pub pool_shared_account: ProgramAccount<'info, PoolSharedAccount>,
-    pub system_program: AccountInfo<'info>,
-    pub token_program: AccountInfo<'info>,
+    pub system_program: Program<'info, System>,
+    pub token_program: Program<'info, Token>,
 }
 
 impl<'info> Initialize<'info> {
