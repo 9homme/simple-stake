@@ -136,7 +136,6 @@ pub struct CreateUserAccount<'info> {
 #[derive(Accounts)]
 #[instruction(stake_amount: u64)]
 pub struct Stake<'info> {
-    #[account(mut)]
     pub user: Signer<'info>,
     #[account(
         mut,
@@ -162,7 +161,6 @@ pub struct Stake<'info> {
 #[derive(Accounts)]
 #[instruction(unstake_amount: u64)]
 pub struct Unstake<'info> {
-    #[account(mut)]
     pub user: Signer<'info>,
     #[account(
         mut,
