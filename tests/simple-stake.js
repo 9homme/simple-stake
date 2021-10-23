@@ -22,7 +22,9 @@ describe('simple-stake', () => {
   let poolVaultAuthorityPda = null;
 
 
-  const poolSharedAccount = anchor.web3.Keypair.generate();
+  let poolSharedAccountPda = null;
+  let poolSharedAccountBump = null;
+
   const payer = anchor.web3.Keypair.generate();
   const mintAuthority = anchor.web3.Keypair.generate();
   const initializerMainAccount = anchor.web3.Keypair.generate();
@@ -100,45 +102,44 @@ describe('simple-stake', () => {
   });
 
   it('pool can be initialized by initializer', async () => {
-    const [_pool_vault_account_pda, _pool_vault_account_bump] = await PublicKey.findProgramAddress(
+    [poolVaultAccountPda, poolVaultAccountBump] = await PublicKey.findProgramAddress(
       [Buffer.from(anchor.utils.bytes.utf8.encode("pool_vault_account"))],
       program.programId
     );
 
-    poolVaultAccountPda = _pool_vault_account_pda;
-    poolVaultAccountBump = _pool_vault_account_bump;
 
-    const [_pool_vault_authority_pda, _pool_vault_authority_bumo] = await PublicKey.findProgramAddress(
+    [poolVaultAuthorityPda, _] = await PublicKey.findProgramAddress(
       [Buffer.from(anchor.utils.bytes.utf8.encode("simple_stake"))],
       program.programId
     );
 
-    poolVaultAuthorityPda = _pool_vault_authority_pda;
+    [poolSharedAccountPda, poolSharedAccountBump] = await PublicKey.findProgramAddress(
+      [Buffer.from(anchor.utils.bytes.utf8.encode("pool_shared_account"))],
+      program.programId
+    );
+
 
     await program.rpc.initialize(
-      poolVaultAccountBump,
+      poolVaultAccountBump, poolSharedAccountBump,
       {
         accounts: {
           initializer: initializerMainAccount.publicKey,
           mint: mintA.publicKey,
           poolVaultAccount: poolVaultAccountPda,
-          poolSharedAccount: poolSharedAccount.publicKey,
+          poolSharedAccount: poolSharedAccountPda,
           systemProgram: anchor.web3.SystemProgram.programId,
           rent: anchor.web3.SYSVAR_RENT_PUBKEY,
           tokenProgram: TOKEN_PROGRAM_ID,
 
         },
-        instructions: [
-          await program.account.poolSharedAccount.createInstruction(poolSharedAccount),
-        ],
-        signers: [poolSharedAccount, initializerMainAccount],
+        signers: [initializerMainAccount],
       }
     );
 
     let _vault = await mintA.getAccountInfo(poolVaultAccountPda);
 
     let _poolSharedAccount = await program.account.poolSharedAccount.fetch(
-      poolSharedAccount.publicKey
+      poolSharedAccountPda
     );
 
     assert.ok(_vault.owner.equals(poolVaultAuthorityPda));
@@ -186,7 +187,7 @@ describe('simple-stake', () => {
           userAccount: _user01StakeAccountPda,
           userTokenAccount: user01TokenAccountA,
           poolVaultAccount: poolVaultAccountPda,
-          poolSharedAccount: poolSharedAccount.publicKey,
+          poolSharedAccount: poolSharedAccountPda,
           systemProgram: anchor.web3.SystemProgram.programId,
           tokenProgram: TOKEN_PROGRAM_ID,
         },
@@ -239,7 +240,7 @@ describe('simple-stake', () => {
             userAccount: _user02StakeAccountPda,
             userTokenAccount: user02TokenAccountA,
             poolVaultAccount: poolVaultAccountPda,
-            poolSharedAccount: poolSharedAccount.publicKey,
+            poolSharedAccount: poolSharedAccountPda,
             systemProgram: anchor.web3.SystemProgram.programId,
             tokenProgram: TOKEN_PROGRAM_ID,
           },
@@ -279,7 +280,7 @@ describe('simple-stake', () => {
           userAccount: _user02StakeAccountPda,
           userTokenAccount: user02TokenAccountA,
           poolVaultAccount: poolVaultAccountPda,
-          poolSharedAccount: poolSharedAccount.publicKey,
+          poolSharedAccount: poolSharedAccountPda,
           systemProgram: anchor.web3.SystemProgram.programId,
           tokenProgram: TOKEN_PROGRAM_ID,
         },
@@ -316,7 +317,7 @@ describe('simple-stake', () => {
             userAccount: _user01StakeAccountPda,
             userTokenAccount: user02TokenAccountA,
             poolVaultAccount: poolVaultAccountPda,
-            poolSharedAccount: poolSharedAccount.publicKey,
+            poolSharedAccount: poolSharedAccountPda,
             systemProgram: anchor.web3.SystemProgram.programId,
             tokenProgram: TOKEN_PROGRAM_ID,
           },
@@ -345,7 +346,7 @@ describe('simple-stake', () => {
             userAccount: _user02StakeAccountPda,
             userTokenAccount: user02TokenAccountA,
             poolVaultAccount: poolVaultAccountPda,
-            poolSharedAccount: poolSharedAccount.publicKey,
+            poolSharedAccount: poolSharedAccountPda,
             systemProgram: anchor.web3.SystemProgram.programId,
             tokenProgram: TOKEN_PROGRAM_ID,
           },
@@ -374,7 +375,7 @@ describe('simple-stake', () => {
           userTokenAccount: user02TokenAccountA,
           poolVaultAccount: poolVaultAccountPda,
           poolVaultAuthority: poolVaultAuthorityPda,
-          poolSharedAccount: poolSharedAccount.publicKey,
+          poolSharedAccount: poolSharedAccountPda,
           systemProgram: anchor.web3.SystemProgram.programId,
           tokenProgram: TOKEN_PROGRAM_ID,
         },
@@ -412,7 +413,7 @@ describe('simple-stake', () => {
             userTokenAccount: user01TokenAccountA,
             poolVaultAccount: poolVaultAccountPda,
             poolVaultAuthority: poolVaultAuthorityPda,
-            poolSharedAccount: poolSharedAccount.publicKey,
+            poolSharedAccount: poolSharedAccountPda,
             systemProgram: anchor.web3.SystemProgram.programId,
             tokenProgram: TOKEN_PROGRAM_ID,
           },

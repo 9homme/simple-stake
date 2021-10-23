@@ -11,7 +11,7 @@ const SIMPLE_STAKE_PDA_SEED: &[u8] = b"simple_stake";
 pub mod simple_stake {
 
     use super::*;
-    pub fn initialize(ctx: Context<Initialize>, _pool_vault_account_bump: u8) -> ProgramResult {
+    pub fn initialize(ctx: Context<Initialize>, _pool_vault_account_bump: u8, _pool_shared_account_bump: u8) -> ProgramResult {
         // Initialize pool shared account value
         ctx.accounts.pool_shared_account.initializer_key = *ctx.accounts.initializer.key;
         ctx.accounts.pool_shared_account.pool_vault_account_key =
@@ -94,7 +94,7 @@ pub struct UserAccount {
 }
 
 #[derive(Accounts)]
-#[instruction(pool_vault_account_bump: u8)]
+#[instruction(pool_vault_account_bump: u8, pool_shared_account_bump: u8)]
 pub struct Initialize<'info> {
     #[account(mut)]
     pub initializer: Signer<'info>,
@@ -108,7 +108,13 @@ pub struct Initialize<'info> {
         token::authority = initializer,
     )]
     pub pool_vault_account: Account<'info, TokenAccount>,
-    #[account(zero)]
+    #[account(
+        init,
+        seeds = [b"pool_shared_account".as_ref()],
+        bump = pool_shared_account_bump,
+        payer = initializer,
+        space = 8 + 32 + 32 + 8,
+    )]
     pub pool_shared_account: Account<'info, PoolSharedAccount>,
     pub system_program: Program<'info, System>,
     pub rent: Sysvar<'info, Rent>,
